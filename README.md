@@ -1,5 +1,5 @@
 
-# README: Concurrent HTTP Server with Thread Pool
+# Concurrent HTTP Server with Thread Pool
 
 ## Overview
 This project implements a concurrent HTTP server in C++ using a `TCPServer` for handling TCP connections, a `ThreadPool` for concurrent task execution, and an `HTTPServer` that utilizes both to handle HTTP requests efficiently. The server adheres to the SOLID principles, emphasizing modularity and maintainability.
