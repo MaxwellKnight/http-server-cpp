@@ -15,6 +15,7 @@ void HTTPServer::handle_client(int client_socket) {
         std::string request = read_fd(client_socket);
         std::string response = handle_request(request);
 		write_fd(client_socket, response);
+		sleep(1);
         close(client_socket);
     });
 }
