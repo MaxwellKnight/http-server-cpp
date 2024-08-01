@@ -59,4 +59,3 @@ This project provides a practical demonstration of several key networking and co
 - TCP Networking: Shows how to establish and manage TCP connections, which are fundamental for network communication.
 - Concurrency: Utilizes a thread pool to manage multiple tasks concurrently, highlighting the importance of multithreading in network servers to handle multiple connections efficiently.
 - HTTP Protocol: Implements a basic HTTP/1.1 server, offering insights into how web servers process and respond to HTTP requests.
-- main.cpp: Entry point of the application, initializes and starts the HTTP server.
