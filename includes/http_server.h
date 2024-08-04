@@ -14,13 +14,13 @@
 class HTTPServer {
 public:
     HTTPServer(int port, size_t num_threads);
-
     void start();
 
 private:
     TCPServer server;
     ThreadPool pool;
 
+private:
     void handle_client(int client_socket);
     std::string read_fd(int client_socket);
     std::string handle_request(const std::string& request);

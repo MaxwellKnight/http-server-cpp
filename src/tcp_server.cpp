@@ -1,8 +1,10 @@
 #include "../includes/tcp_server.h"
+#include <iostream>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 TCPServer::TCPServer(int port) : port(port), server_fd(-1) {}
 
@@ -52,11 +54,22 @@ void TCPServer::tcp_listen(const std::function<void(int)>& client_handler) {
 int TCPServer::tcp_accept() {
     struct sockaddr_in client_address;
     socklen_t client_len = sizeof(client_address);
+
     int client_socket = accept(server_fd, (struct sockaddr*)&client_address, &client_len);
     if (client_socket < 0) {
         perror("accept failed");
     }
+	//print the connected client ip address
+	std::cout << "accepted a connection from: " << get_client_ip(client_socket) << '\n';
     return client_socket;
+}
+
+std::string TCPServer::get_client_ip(int client_socket) {
+    struct sockaddr_in addr;
+    socklen_t addr_size = sizeof(struct sockaddr_in);
+    getpeername(client_socket, (struct sockaddr *)&addr, &addr_size);
+
+    return std::string(inet_ntoa(addr.sin_addr));
 }
 
 void TCPServer::tcp_close() {
