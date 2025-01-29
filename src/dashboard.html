@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Performance Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #3b82f6;
+            --success-color: #059669;
+            --danger-color: #dc2626;
+            --background-color: #f8fafc;
+            --card-background: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.5;
+            padding: 1.5rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-background);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-trend {
+            font-size: 0.875rem;
+            color: var(--success-color);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .trend-up::before {
+            content: "↑";
+        }
+
+        .trend-down::before {
+            content: "↓";
+        }
+
+        .chart-container {
+            background: var(--card-background);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        #times-chart {
+            width: 100%;
+            height: 400px;
+        }
+
+        .refresh-status {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success-color);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.5;
+            }
+            50% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(0.95);
+                opacity: 0.5;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .stat-card {
+                padding: 1rem;
+            }
+
+            .stat-value {
+                font-size: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Server Performance Dashboard</h1>
+            <p>Real-time monitoring of server response times and performance metrics</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">Average Response Time</span>
+                <div class="stat-value" id="avg-time">0.00 ms</div>
+                <div class="stat-trend trend-down" id="avg-trend"></div>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-label">Maximum Response Time</span>
+                <div class="stat-value" id="max-time">0.00 ms</div>
+                <div class="stat-trend" id="max-trend"></div>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-label">Total Requests</span>
+                <div class="stat-value" id="request-count">0</div>
+                <div class="stat-trend trend-up" id="req-trend"></div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div id="times-chart"></div>
+        </div>
+
+        <div class="refresh-status">
+            <div class="pulse"></div>
+            <span>Live updating every 1 seconds</span>
+        </div>
+    </div>
+
+    <script>
+        let previousData = null;
+
+        function updateTrend(currentValue, previousValue, elementId, format = 'decimal') {
+            const element = document.getElementById(elementId);
+            if (previousValue === null) return;
+
+            const diff = currentValue - previousValue;
+            const percentage = ((diff / previousValue) * 100).toFixed(1);
+            
+            if (diff === 0) {
+                element.textContent = 'No change';
+                element.className = 'stat-trend';
+            } else {
+                const formattedDiff = format === 'decimal' ? Math.abs(diff).toFixed(2) : Math.abs(diff);
+                element.textContent = `${Math.abs(percentage)}% (${formattedDiff})`;
+                element.className = diff < 0 ? 'stat-trend trend-down' : 'stat-trend trend-up';
+            }
+        }
+
+        function updateStats() {
+            fetch('/stats')
+                .then(response => response.json())
+                .then(data => {
+                    // Update stats with animation
+                    document.getElementById('avg-time').textContent = `${data.avg.toFixed(2)} ms`;
+                    document.getElementById('max-time').textContent = `${data.max.toFixed(2)} ms`;
+                    document.getElementById('request-count').textContent = data.count;
+
+                    // Update trends
+                    if (previousData) {
+                        updateTrend(data.avg, previousData.avg, 'avg-trend');
+                        updateTrend(data.max, previousData.max, 'max-trend');
+                        updateTrend(data.count, previousData.count, 'req-trend', 'integer');
+                    }
+
+                    // Update chart
+                    const trace = {
+                        y: data.times,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Response Time',
+                        line: {
+                            color: '#2563eb',
+                            width: 2,
+                            shape: 'spline'
+                        },
+                        fill: 'tozeroy',
+                        fillcolor: 'rgba(37, 99, 235, 0.1)'
+                    };
+
+                    const layout = {
+                        title: {
+                            text: 'Response Times History',
+                            font: {
+                                family: 'Inter',
+                                size: 18
+                            }
+                        },
+                        yaxis: {
+                            title: 'Response Time (ms)',
+                            rangemode: 'tozero',
+                            gridcolor: '#e2e8f0'
+                        },
+                        xaxis: {
+                            gridcolor: '#e2e8f0'
+                        },
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        margin: {t: 40, r: 20, b: 40, l: 60},
+                        showlegend: false,
+                        hovermode: 'closest'
+                    };
+
+                    const config = {
+                        responsive: true,
+                        displayModeBar: false
+                    };
+
+                    Plotly.newPlot('times-chart', [trace], layout, config);
+
+                    previousData = data;
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Initial update
+        updateStats();
+
+        // Auto-refresh every 5 seconds
+        setInterval(updateStats, 1000);
+    </script>
+</body>
+</html>
