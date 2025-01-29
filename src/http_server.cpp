@@ -4,7 +4,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <cstring>
-#include <chrono>
 #include <algorithm>
 #include <iomanip>
 #include <fstream>
@@ -42,9 +41,11 @@ void HTTPServer::handle_client(int client_socket) {
         return;
     }
 
-    pool.enqueue([client_socket, this] {
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    pool.enqueue([this, client_socket, start_time] {
         try {
-            process_client_connection(client_socket);
+            process_client_connection(client_socket, start_time);
         } catch (const std::exception& e) {
             try {
                 send_error_response(client_socket, 500, "Internal Server Error");
@@ -56,32 +57,34 @@ void HTTPServer::handle_client(int client_socket) {
     });
 }
 
-void HTTPServer::process_client_connection(int client_socket) {
-    auto start = std::chrono::high_resolution_clock::now();
-
+void HTTPServer::process_client_connection(
+    int client_socket,
+    std::chrono::time_point<std::chrono::high_resolution_clock> start_time) 
+{
     try {
         std::string request = read_fd(client_socket);
         if (request.empty()) {
             throw std::runtime_error("Empty request received");
         }
 
-        const int work_size = 100000;
-        std::vector<bool> is_prime(work_size, true);
-        for (int i = 2; i * i < work_size; i++) {
-            if (is_prime[i]) {
-                for (int j = i * i; j < work_size; j += i) {
-                    is_prime[j] = false;
+        // Simulate CPU-intensive work
+        const int matrix_size = 300;
+        std::vector<double> results(matrix_size * matrix_size, 0.0);
+        for (int i = 0; i < matrix_size; i++) {
+            for (int j = 0; j < matrix_size; j++) {
+                double sum = 0.0;
+                for (int k = 0; k < 1000; k++) {
+                    sum += std::sin(i * j * k) * std::cos(i + j + k);
                 }
+                results[i * matrix_size + j] = sum;
             }
         }
 
         std::string response = handle_request(request);
-        if (!write_fd(client_socket, response)) {
-            throw std::runtime_error("Failed to send response");
-        }
+        write_fd(client_socket, response);
 
-        auto end = std::chrono::high_resolution_clock::now();
-        double duration = std::chrono::duration<double, std::milli>(end - start).count();
+        auto end_time = std::chrono::high_resolution_clock::now();
+        double duration = std::chrono::duration<double, std::milli>(end_time - start_time).count();
         update_response_times(duration);
 
         close(client_socket);
@@ -151,11 +154,11 @@ void HTTPServer::update_response_times(double duration) {
 
 std::string HTTPServer::generate_stats_json() {
     std::lock_guard<std::mutex> lock(response_mutex);
-    
+
     double avg = 0;
     double max_time = 0;
     size_t count = response_times.size();
-    
+
     if (!response_times.empty()) {
         avg = std::accumulate(response_times.begin(), response_times.end(), 0.0) / count;
         max_time = *std::max_element(response_times.begin(), response_times.end());
@@ -172,7 +175,7 @@ std::string HTTPServer::generate_stats_json() {
          << ",\"max\":" << max_time 
          << ",\"count\":" << count 
          << "}";
-    
+
     return json.str();
 }
 
@@ -181,7 +184,7 @@ void HTTPServer::send_error_response(int client_socket, int status_code, const s
     response << "HTTP/1.1 " << status_code << " " << message << "\r\n"
              << "Content-Type: text/html\r\n\r\n"
              << "<html><body><h1>" << status_code << " " << message << "</h1></body></html>";
-    
+
     write_fd(client_socket, response.str());
 }
 
@@ -189,11 +192,11 @@ std::string HTTPServer::handle_request(const std::string& request) {
     std::istringstream request_stream(request);
     std::string method, path, protocol;
     request_stream >> method >> path >> protocol;
-    
+
     if (method.empty() || path.empty()) {
         throw std::runtime_error("Invalid request format");
     }
-    
+
     if (method == "GET") {
         if (path == "/") {
             return generate_html_response();
