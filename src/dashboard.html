@@ -11,6 +11,7 @@
             --primary-color: #2563eb;
             --secondary-color: #3b82f6;
             --success-color: #059669;
+            --warning-color: #eab308;
             --danger-color: #dc2626;
             --background-color: #f8fafc;
             --card-background: #ffffff;
@@ -19,6 +20,19 @@
             --border-color: #e2e8f0;
             --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
             --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        [data-theme="dark"] {
+            --primary-color: #3b82f6;
+            --secondary-color: #60a5fa;
+            --success-color: #10b981;
+            --warning-color: #fbbf24;
+            --danger-color: #ef4444;
+            --background-color: #0f172a;
+            --card-background: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
         }
 
         * {
@@ -33,6 +47,7 @@
             color: var(--text-primary);
             line-height: 1.5;
             padding: 1.5rem;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .container {
@@ -41,8 +56,14 @@
         }
 
         .header {
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 2rem;
+        }
+
+        .header-content {
+            text-align: left;
         }
 
         .header h1 {
@@ -55,6 +76,20 @@
         .header p {
             color: var(--text-secondary);
             font-size: 1rem;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--card-background);
         }
 
         .stats-grid {
@@ -71,10 +106,23 @@
             box-shadow: var(--shadow);
             border: 1px solid var(--border-color);
             transition: transform 0.2s ease;
+            position: relative;
+            overflow: hidden;
         }
 
         .stat-card:hover {
             transform: translateY(-2px);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--primary-color);
+            opacity: 0.5;
         }
 
         .stat-label {
@@ -98,10 +146,23 @@
             display: flex;
             align-items: center;
             gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            width: fit-content;
+        }
+
+        .trend-up {
+            background-color: rgba(5, 150, 105, 0.1);
+            color: var(--success-color);
         }
 
         .trend-up::before {
             content: "↑";
+        }
+
+        .trend-down {
+            background-color: rgba(220, 38, 38, 0.1);
+            color: var(--danger-color);
         }
 
         .trend-down::before {
@@ -160,8 +221,9 @@
                 padding: 1rem;
             }
 
-            .header h1 {
-                font-size: 1.5rem;
+            .header {
+                flex-direction: column;
+                text-align: center;
             }
 
             .stat-card {
@@ -176,10 +238,13 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Server Performance Dashboard</h1>
-            <p>Real-time monitoring of server response times and performance metrics</p>
-        </div>
+        <header class="header">
+            <div class="header-content">
+                <h1>Server Performance Dashboard</h1>
+                <p>Real-time monitoring of server response times and performance metrics</p>
+            </div>
+            <button class="theme-toggle" id="theme-toggle">🌗 Toggle Theme</button>
+        </header>
 
         <div class="stats-grid">
             <div class="stat-card">
@@ -207,12 +272,38 @@
 
         <div class="refresh-status">
             <div class="pulse"></div>
-            <span>Live updating every 1 seconds</span>
+            <span>Live updating every 200 second</span>
         </div>
     </div>
 
     <script>
         let previousData = null;
+        let dataPoints = [];
+        let totalRequests = 0;
+        const maxDataPoints = 10000; 
+
+        // Theme handling
+        const themeToggle = document.getElementById('theme-toggle');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+        function setTheme(isDark) {
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateChart(); // Refresh chart with new theme colors
+        }
+
+        // Initialize theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            setTheme(savedTheme === 'dark');
+        } else {
+            setTheme(prefersDark.matches);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            setTheme(!isDark);
+        });
 
         function updateTrend(currentValue, previousValue, elementId, format = 'decimal') {
             const element = document.getElementById(elementId);
@@ -220,7 +311,7 @@
 
             const diff = currentValue - previousValue;
             const percentage = ((diff / previousValue) * 100).toFixed(1);
-            
+
             if (diff === 0) {
                 element.textContent = 'No change';
                 element.className = 'stat-trend';
@@ -231,77 +322,91 @@
             }
         }
 
-        function updateStats() {
-            fetch('/stats')
-                .then(response => response.json())
-                .then(data => {
-                    // Update stats with animation
-                    document.getElementById('avg-time').textContent = `${data.avg.toFixed(2)} ms`;
-                    document.getElementById('max-time').textContent = `${data.max.toFixed(2)} ms`;
-                    document.getElementById('request-count').textContent = data.count;
+        function updateChart() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-                    // Update trends
-                    if (previousData) {
-                        updateTrend(data.avg, previousData.avg, 'avg-trend');
-                        updateTrend(data.max, previousData.max, 'max-trend');
-                        updateTrend(data.count, previousData.count, 'req-trend', 'integer');
+            const trace = {
+                y: dataPoints,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Response Time',
+                line: {
+                    color: getComputedStyle(document.documentElement).getPropertyValue('--primary-color'),
+                    width: 2,
+                    shape: 'spline'
+                },
+                fill: 'tozeroy',
+                fillcolor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(37, 99, 235, 0.1)'
+            };
+
+            const layout = {
+                title: {
+                    text: 'Response Times History',
+                    font: {
+                        family: 'Inter',
+                        size: 18,
+                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary')
                     }
+                },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                yaxis: {
+                    title: 'Response Time (ms)',
+                    gridcolor: getComputedStyle(document.documentElement).getPropertyValue('--border-color'),
+                    tickfont: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary') }
+                },
+                xaxis: {
+                    gridcolor: getComputedStyle(document.documentElement).getPropertyValue('--border-color'),
+                    tickfont: { color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary') }
+                },
+                margin: { t: 40, r: 20, b: 40, l: 60 },
+                showlegend: false,
+                hovermode: 'closest'
+            };
 
-                    // Update chart
-                    const trace = {
-                        y: data.times,
-                        type: 'scatter',
-                        mode: 'lines',
-                        name: 'Response Time',
-                        line: {
-                            color: '#2563eb',
-                            width: 2,
-                            shape: 'spline'
-                        },
-                        fill: 'tozeroy',
-                        fillcolor: 'rgba(37, 99, 235, 0.1)'
-                    };
+            const config = {
+                responsive: true,
+                displayModeBar: false
+            };
 
-                    const layout = {
-                        title: {
-                            text: 'Response Times History',
-                            font: {
-                                family: 'Inter',
-                                size: 18
-                            }
-                        },
-                        yaxis: {
-                            title: 'Response Time (ms)',
-                            rangemode: 'tozero',
-                            gridcolor: '#e2e8f0'
-                        },
-                        xaxis: {
-                            gridcolor: '#e2e8f0'
-                        },
-                        paper_bgcolor: 'rgba(0,0,0,0)',
-                        plot_bgcolor: 'rgba(0,0,0,0)',
-                        margin: {t: 40, r: 20, b: 40, l: 60},
-                        showlegend: false,
-                        hovermode: 'closest'
-                    };
+            Plotly.newPlot('times-chart', [trace], layout, config);
+        }
 
-                    const config = {
-                        responsive: true,
-                        displayModeBar: false
-                    };
+        async function updateStats() {
+            try {
+                const response = await fetch('/stats');
+                const data = await response.json();
 
-                    Plotly.newPlot('times-chart', [trace], layout, config);
+                // Update stats with animation
+                document.getElementById('avg-time').textContent = `${data.avg.toFixed(2)} ms`;
+                document.getElementById('max-time').textContent = `${data.max.toFixed(2)} ms`;
+                totalRequests = data.count;
+                document.getElementById('request-count').textContent = totalRequests;
 
-                    previousData = data;
-                })
-                .catch(error => console.error('Error:', error));
+                // Update trends
+                if (previousData) {
+                    updateTrend(data.avg, previousData.avg, 'avg-trend');
+                    updateTrend(data.max, previousData.max, 'max-trend');
+                    updateTrend(data.count, previousData.count, 'req-trend', 'integer');
+                }
+
+                // Update chart data
+                dataPoints.push(...data.times);
+                if (dataPoints.length > maxDataPoints) {
+                    dataPoints = dataPoints.slice(-maxDataPoints);
+                }
+                updateChart();
+
+                previousData = data;
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
         }
 
         // Initial update
         updateStats();
 
-        // Auto-refresh every 5 seconds
-        setInterval(updateStats, 100);
+        setInterval(updateStats, 200);
     </script>
 </body>
 </html>

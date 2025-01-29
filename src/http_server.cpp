@@ -13,7 +13,7 @@
 static const size_t MAX_PENDING_TASKS = 1000;
 static const size_t MAX_REQUEST_SIZE = 1024 * 1024; // 1MB
 static const int SOCKET_TIMEOUT_SECONDS = 30;
-static const size_t MAX_RESPONSE_TIMES = 50;
+static const size_t MAX_RESPONSE_TIMES = 10000;
 
 HTTPServer::HTTPServer(int port, size_t num_threads) 
     : server(port), pool(num_threads) {
@@ -204,7 +204,7 @@ std::string HTTPServer::handle_request(const std::string& request) {
             return generate_stats_response();
         }
     }
-    
+
     throw std::runtime_error("Not Found");
 }
 
