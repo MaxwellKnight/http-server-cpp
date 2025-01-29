@@ -1,5 +1,4 @@
 #include "../includes/thread_pool.h"
-#include <chrono>
 #include <thread>
 
 ThreadPool::ThreadPool(size_t threads) : stop(false) {

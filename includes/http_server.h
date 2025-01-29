@@ -18,12 +18,12 @@ private:
     ThreadPool pool;
     std::vector<double> response_times;
     std::mutex response_mutex;
-    
+
     // Connection timing structure
     struct ClientTask {
         int socket;
         std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
-        
+
         ClientTask(int s, std::chrono::time_point<std::chrono::high_resolution_clock> t) 
             : socket(s), start_time(t) {}
     };
